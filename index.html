@@ -1,0 +1,641 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Bone Fracture Detection System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        const BoneMappingApp = () => {
+            const [step, setStep] = useState(1);
+            const [sessionId, setSessionId] = useState(null);
+            const [xrayImage, setXrayImage] = useState(null);
+            const [modelFile, setModelFile] = useState(null);
+            const [landmarks, setLandmarks] = useState([]);
+            const [currentLandmark, setCurrentLandmark] = useState(0);
+            const [fractureData, setFractureData] = useState(null);
+            const [processing, setProcessing] = useState(false);
+            const [modelUrl, setModelUrl] = useState(null);
+            const canvasRef = useRef(null);
+            const threeContainerRef = useRef(null);
+            const sceneRef = useRef(null);
+
+            const API_BASE = 'http://localhost:8000';
+            const landmarkLabels = ['ulna_head', 'ulna_tail', 'radius_head', 'radius_tail'];
+            const displayLabels = ['Ulna Head', 'Ulna Tail', 'Radius Head', 'Radius Tail'];
+
+            // Handle X-ray image upload
+            const handleXrayUpload = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await fetch(`${API_BASE}/upload/xray`, {
+                        method: 'POST',
+                        body: formData,
+                    });
+                    
+                    const data = await response.json();
+                    setSessionId(data.session_id);
+                    setXrayImage(data.image_base64);
+                    setStep(2);
+                } catch (error) {
+                    console.error('Error uploading X-ray:', error);
+                    alert('Error uploading X-ray image. Make sure backend is running!');
+                }
+            };
+
+            
+            const handleModelUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // ✅ Size check (10 MB recommended, 15 MB max)
+    const MAX_SIZE_MB = 15;
+    const sizeMB = file.size / (1024 * 1024);
+
+    if (sizeMB > MAX_SIZE_MB) {
+        alert(`3D model is too large (${sizeMB.toFixed(1)} MB).\nPlease upload a GLB under ${MAX_SIZE_MB} MB.`);
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const url = sessionId
+            ? `${API_BASE}/upload/model?session_id=${sessionId}`
+            : `${API_BASE}/upload/model`;
+
+        // ✅ Do NOT parse response JSON (important)
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error("Upload failed");
+        }
+
+        // ✅ Success
+        setModelFile(file);
+        alert("3D model uploaded successfully!");
+
+    } catch (error) {
+        console.error("Model upload error:", error);
+        alert("3D model upload failed. Please try a smaller file.");
+    }
+};
+
+
+            // Initialize Three.js viewer
+            useEffect(() => {
+                if (modelUrl && threeContainerRef.current && step === 4) {
+                    initThreeJS();
+                }
+            }, [modelUrl, step]);
+
+            const initThreeJS = async () => {
+                const THREE = await import('three');
+                const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+                const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+
+                const container = threeContainerRef.current;
+                container.innerHTML = '';
+
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0xf0f0f0);
+
+                const camera = new THREE.PerspectiveCamera(
+                    75,
+                    container.clientWidth / container.clientHeight,
+                    0.1,
+                    1000
+                );
+                camera.position.z = 2;
+
+                const renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(container.clientWidth, container.clientHeight);
+                container.appendChild(renderer.domElement);
+
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                scene.add(ambientLight);
+
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(10, 10, 10);
+                scene.add(directionalLight);
+
+                const loader = new GLTFLoader();
+                loader.load(
+                    modelUrl,
+                    (gltf) => {
+                        scene.add(gltf.scene);
+                        const box = new THREE.Box3().setFromObject(gltf.scene);
+                        const center = box.getCenter(new THREE.Vector3());
+                        gltf.scene.position.sub(center);
+                    },
+                    undefined,
+                    (error) => console.error('Error loading model:', error)
+                );
+
+                function animate() {
+                    requestAnimationFrame(animate);
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+                animate();
+
+                sceneRef.current = { scene, camera, renderer, controls };
+            };
+
+            useEffect(() => {
+                if (xrayImage && canvasRef.current && step === 2) {
+                    const canvas = canvasRef.current;
+                    const ctx = canvas.getContext('2d');
+                    const img = new Image();
+                    
+                    img.onload = () => {
+                        const maxWidth = 800;
+                        const scale = Math.min(1, maxWidth / img.width);
+                        canvas.width = img.width * scale;
+                        canvas.height = img.height * scale;
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        
+                        landmarks.forEach((landmark, idx) => {
+                            ctx.fillStyle = '#ef4444';
+                            ctx.beginPath();
+                            ctx.arc(landmark.x, landmark.y, 8, 0, 2 * Math.PI);
+                            ctx.fill();
+                            
+                            ctx.fillStyle = '#3b82f6';
+                            ctx.font = 'bold 14px Arial';
+                            ctx.fillText(displayLabels[idx], landmark.x + 12, landmark.y - 8);
+                        });
+                    };
+                    
+                    img.src = xrayImage;
+                }
+            }, [xrayImage, landmarks, step]);
+
+            const handleCanvasClick = (e) => {
+                if (currentLandmark >= 4) return;
+
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                const newLandmarks = [...landmarks, { 
+                    x, 
+                    y, 
+                    label: landmarkLabels[currentLandmark] 
+                }];
+                setLandmarks(newLandmarks);
+                setCurrentLandmark(currentLandmark + 1);
+
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                ctx.fillStyle = '#3b82f6';
+                ctx.font = 'bold 14px Arial';
+                ctx.fillText(displayLabels[currentLandmark], x + 12, y - 8);
+
+                if (currentLandmark === 3) {
+                    setTimeout(() => setStep(3), 500);
+                }
+            };
+
+            const processFractureDetection = async () => {
+                setProcessing(true);
+                
+                try {
+                    const response = await fetch(`${API_BASE}/process/landmarks`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            session_id: sessionId,
+                            landmarks: landmarks.map((lm, idx) => ({
+                                x: lm.x,
+                                y: lm.y,
+                                label: displayLabels[idx]
+                            }))
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    setFractureData(data);
+                    
+                    // Check if model was uploaded
+                    if (modelFile && sessionId) {
+                        // Try original model first, fall back to fractured
+                        const modelUrl = `${API_BASE}/model/${sessionId}/original?t=${Date.now()}`;
+                        console.log('Loading 3D model from:', modelUrl);
+                        setModelUrl(modelUrl);
+                    }
+                    
+                    setStep(4);
+                } catch (error) {
+                    console.error('Error processing:', error);
+                    alert('Error processing fracture detection: ' + error.message);
+                } finally {
+                    setProcessing(false);
+                }
+            };
+
+            const handleReset = () => {
+                setStep(1);
+                setSessionId(null);
+                setXrayImage(null);
+                setModelFile(null);
+                setLandmarks([]);
+                setCurrentLandmark(0);
+                setFractureData(null);
+                setModelUrl(null);
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="text-center mb-8">
+                            <h1 className="text-4xl font-bold text-gray-800 mb-2">
+                                3D Bone Fracture Detection System
+                            </h1>
+                            <p className="text-gray-600">Upload X-ray images and analyze bone fractures with AI</p>
+                        </div>
+
+                        <div className="flex justify-between mb-8 bg-white rounded-lg p-4 shadow-md">
+                            {['Upload', 'Mark Landmarks', 'Process', 'Results'].map((label, idx) => (
+                                <div key={idx} className="flex items-center">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold
+                                        ${step > idx + 1 ? 'bg-green-500 text-white' : 
+                                          step === idx + 1 ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-600'}`}>
+                                        {step > idx + 1 ? '✓' : idx + 1}
+                                    </div>
+                                    <span className="ml-2 font-medium text-gray-700">{label}</span>
+                                    {idx < 3 && <div className="w-12 h-1 bg-gray-300 mx-4"></div>}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-lg p-8">
+                            {step === 1 && (
+                                <div className="space-y-6">
+                                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-blue-500 transition-colors">
+                                        <svg className="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                        </svg>
+                                        <h3 className="text-xl font-semibold mb-2">Upload X-ray Image</h3>
+                                        <p className="text-gray-600 mb-4">PNG, JPG or JPEG (Max 10MB)</p>
+                                        <label className="cursor-pointer bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg inline-block transition-colors">
+                                            Choose File
+                                            <input type="file" accept="image/*" onChange={handleXrayUpload} className="hidden" />
+                                        </label>
+                                    </div>
+
+                                    <div className="border-2 border-gray-300 rounded-lg p-8 text-center">
+                                        <svg className="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                        <h3 className="text-lg font-semibold mb-2">Upload 3D Model (Optional)</h3>
+                                        <p className="text-gray-600 mb-3 text-sm">GLB format - Can upload before or after X-ray</p>
+                                        <label className="cursor-pointer bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg inline-block transition-colors text-sm">
+                                            Choose Model
+                                            <input type="file" accept=".glb,.gltf" onChange={handleModelUpload} className="hidden" />
+                                        </label>
+                                        {modelFile && <p className="text-green-600 mt-2 text-sm">✓ {modelFile.name}</p>}
+                                    </div>
+                                </div>
+                            )}
+
+                            {step === 2 && (
+                                <div>
+                                    <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                        <div className="flex items-center">
+                                            <svg className="h-5 w-5 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                            </svg>
+                                            <p className="text-blue-800 font-medium">
+                                                Click to mark: <span className="font-bold">{displayLabels[currentLandmark]}</span>
+                                                <span className="ml-2 text-sm">({currentLandmark + 1}/4)</span>
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="border-2 border-gray-200 rounded-lg overflow-hidden flex justify-center bg-gray-50">
+                                        <canvas ref={canvasRef} onClick={handleCanvasClick} className="cursor-crosshair max-w-full h-auto" />
+                                    </div>
+
+                                    <div className="mt-4 grid grid-cols-4 gap-2">
+                                        {displayLabels.map((label, idx) => (
+                                            <div key={idx} className={`p-3 rounded-lg text-center text-sm font-medium
+                                                ${idx < currentLandmark ? 'bg-green-100 text-green-800' : 
+                                                  idx === currentLandmark ? 'bg-blue-100 text-blue-800' : 
+                                                  'bg-gray-100 text-gray-500'}`}>
+                                                {idx < currentLandmark && '✓ '}{label}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {step === 3 && (
+                                <div className="text-center py-12">
+                                    <svg className="mx-auto h-20 w-20 text-green-500 mb-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <h3 className="text-2xl font-bold mb-4">Landmarks Marked Successfully!</h3>
+                                    <p className="text-gray-600 mb-8">Ready to detect fractures</p>
+                                    
+                                    <button onClick={processFractureDetection} disabled={processing}
+                                        className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-4 rounded-lg font-semibold text-lg inline-flex items-center transition-colors disabled:bg-gray-400">
+                                        <svg className="mr-2 h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                                        </svg>
+                                        {processing ? 'Processing...' : 'Start Fracture Detection'}
+                                    </button>
+                                </div>
+                            )}
+
+                            {step === 4 && fractureData && (
+                                <div className="space-y-6">
+                                    <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6">
+                                        <h3 className="text-2xl font-bold text-gray-800 mb-2">Detection Complete!</h3>
+                                        <p className="text-gray-700">
+                                            Confidence: <span className="font-bold text-green-600">
+                                                {(fractureData.confidence * 100).toFixed(1)}%
+                                            </span>
+                                        </p>
+                                    </div>
+
+                                    {modelUrl && (
+                                        <div className="border-2 border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                                            <div className="bg-gray-700 text-white px-4 py-2 flex items-center">
+                                                <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                </svg>
+                                                <span className="font-semibold">3D Model Viewer</span>
+                                            </div>
+                                            <div ref={threeContainerRef} className="w-full h-96"></div>
+                                            <div className="bg-gray-100 px-4 py-2 text-sm text-gray-600">
+                                                Use mouse to rotate, zoom, and pan the model
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="grid md:grid-cols-2 gap-6">
+                                        {fractureData.fractures.map((fracture, idx) => (
+                                            <div key={idx} className="border-2 border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
+                                                <h4 className="text-xl font-bold text-gray-800 mb-4 capitalize">{fracture.bone} Fracture</h4>
+                                                
+                                                <div className="space-y-3">
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-600">Type:</span>
+                                                        <span className="font-semibold capitalize">{fracture.damage}</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-600">Location:</span>
+                                                        <span className="font-semibold">{(fracture.location * 100).toFixed(0)}% from top</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-600">Top Angle:</span>
+                                                        <span className="font-semibold">{fracture.top_angle.toFixed(1)}°</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-600">Bottom Angle:</span>
+                                                        <span className="font-semibold">{fracture.bottom_angle.toFixed(1)}°</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center pt-2 border-t">
+                                                        <span className="text-gray-600">Severity:</span>
+                                                        <span className={`font-bold capitalize px-3 py-1 rounded-full text-sm
+                                                            ${fracture.severity === 'severe' ? 'bg-red-100 text-red-800' :
+                                                              fracture.severity === 'moderate' ? 'bg-yellow-100 text-yellow-800' :
+                                                              'bg-green-100 text-green-800'}`}>
+                                                            {fracture.severity}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="bg-gray-50 rounded-lg p-6 mt-6">
+                                        <h4 className="font-bold text-gray-800 mb-3">Detected Bones:</h4>
+                                        <div className="flex gap-2">
+                                            {fractureData.detected_bones.map((bone, idx) => (
+                                                <span key={idx} className="bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-medium capitalize">
+                                                    {bone}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-4 mt-8">
+                                        <button onClick={handleReset}
+                                            className="flex-1 bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors">
+                                            Start New Analysis
+                                        </button>
+                                        <button className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold inline-flex items-center justify-center transition-colors">
+                                            <svg className="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                            </svg>
+                                            Download Report
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="text-center mt-8 text-gray-600 text-sm">
+                            <p>Backend API: <span className="font-mono bg-gray-200 px-2 py-1 rounded">{API_BASE}</span></p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<BoneMappingApp />, document.getElementById('root'));
+    </script>
+</body>
+</html> -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>3D Bone Fracture Detection</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- React Router -->
+  <script src="https://unpkg.com/react-router-dom@6/umd/react-router-dom.production.min.js"></script>
+
+  <!-- Babel -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Three.js -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+
+<body class="bg-blue-50">
+<div id="root"></div>
+
+<script type="text/babel">
+const {
+  BrowserRouter,
+  Routes,
+  Route,
+  useNavigate,
+  useParams
+} = ReactRouterDOM;
+
+const API = "http://localhost:8000";
+
+/* ================= HOME ================= */
+function Home() {
+  const navigate = useNavigate();
+
+  const uploadXray = async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+
+    const fd = new FormData();
+    fd.append("file", f);
+
+    const res = await fetch(API + "/upload/xray", { method: "POST", body: fd });
+    const data = await res.json();
+
+    navigate(`/xray/${data.session_id}`);
+  };
+
+  const uploadModel = async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+
+    const fd = new FormData();
+    fd.append("file", f);
+
+    const res = await fetch(API + "/upload/model", { method: "POST", body: fd });
+    const data = await res.json();
+
+    navigate(`/visualize/${data.session_id}`);
+  };
+
+  return (
+    <div className="max-w-xl mx-auto p-6 bg-white rounded shadow space-y-4">
+      <h1 className="text-2xl font-bold text-center">Upload</h1>
+      <input type="file" accept="image/*" onChange={uploadXray} />
+      <input type="file" accept=".glb" onChange={uploadModel} />
+    </div>
+  );
+}
+
+/* ================= VISUALIZE ================= */
+function Visualize() {
+  const { sessionId } = useParams();
+  const ref = React.useRef(null);
+
+  React.useEffect(() => {
+    (async () => {
+      const THREE = await import("three");
+      const { GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js");
+      const { OrbitControls } = await import("three/addons/controls/OrbitControls.js");
+
+      const el = ref.current;
+      el.innerHTML = "";
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xf0f0f0);
+
+      const camera = new THREE.PerspectiveCamera(70, el.clientWidth / el.clientHeight, 0.1, 1000);
+      camera.position.z = 2;
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(el.clientWidth, el.clientHeight);
+      el.appendChild(renderer.domElement);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+      const light = new THREE.DirectionalLight(0xffffff, 0.6);
+      light.position.set(10,10,10);
+      scene.add(light);
+
+      new GLTFLoader().load(
+        `${API}/model/${sessionId}/original`,
+        gltf => {
+          scene.add(gltf.scene);
+          const box = new THREE.Box3().setFromObject(gltf.scene);
+          gltf.scene.position.sub(box.getCenter(new THREE.Vector3()));
+        }
+      );
+
+      const animate = () => {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      };
+      animate();
+    })();
+  }, []);
+
+  return (
+    <div className="p-6">
+      <h2 className="text-xl font-bold text-center mb-4">3D Visualization</h2>
+      <div ref={ref} className="h-96 bg-white rounded shadow"></div>
+    </div>
+  );
+}
+
+/* ================= APP ================= */
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/visualize/:sessionId" element={<Visualize />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+ReactDOM.render(<App />, document.getElementById("root"));
+</script>
+</body>
+</html>
