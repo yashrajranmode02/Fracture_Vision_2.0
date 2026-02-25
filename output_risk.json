@@ -1,0 +1,17 @@
+{
+    "damaged_structures": [
+        {
+            "name": "Ulnar Nerve",
+            "probability": 0.55
+        },
+        {
+            "name": "Ulnar Artery",
+            "probability": 0.46
+        },
+        {
+            "name": "Radial Nerve",
+            "probability": 0.42
+        }
+    ],
+    "summary": "The fracture of the ulna and radius bones poses a significant risk to the surrounding neurovascular structures. The ulnar nerve is at high risk of damage due to its proximity to the fracture site and the angular deformity of the bone. The ulnar artery is also at risk of injury, particularly due to the anteromedial direction of the fracture, which may lead to vascular compromise. The radial nerve, although less likely to be damaged, is still at risk due to the bilateral bone involvement and the potential for fragment displacement. The biomechanical instability caused by the fractures may lead to compartment pressure increases, further exacerbating the risk of nerve and vessel damage. The angular deformity of the bones may result in nerve entrapment, particularly of the ulnar nerve, which could lead to motor deficits and paresthesia. The risk of vessel compression from fragment displacement is also a concern, as it may lead to ischemia and hematoma formation. The overall risk of damage to these structures is elevated due to the complex nature of the fractures and the proximity of the neurovascular bundles to the fracture sites. The clinical management of these fractures should prioritize the stabilization of the bones and the protection of the surrounding soft tissues to minimize the risk of further injury."
+}
