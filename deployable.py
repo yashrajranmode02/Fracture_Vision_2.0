@@ -6,6 +6,8 @@ import tempfile
 import argparse
 from dotenv import load_dotenv
 
+load_dotenv()  # Load .env before reading any env vars
+
 import cv2
 import numpy as np
 import open3d as o3d
@@ -561,7 +563,7 @@ def analyze_fracture_risk(fracture_list, embedder, index, documents):
 # =============================================================
 
 def main():
-    load_dotenv()   # load environment variables (for GROQ_API_KEY)
+    # load_dotenv() already called at module level
 
     print("[1/7] Loading and preprocessing 3D model...")
     mesh = load_and_preprocess_mesh(MODEL_3D_PATH)

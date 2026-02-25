@@ -1,0 +1,24 @@
+# ML / Computer Vision
+opencv-python
+numpy
+open3d
+faiss-cpu
+torch
+torchvision
+ultralytics
+sentence-transformers
+
+# Web Backend
+fastapi
+uvicorn[standard]
+python-multipart
+sse-starlette
+
+# Auth & Persistence
+supabase
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Utilities
+requests
+python-dotenv
