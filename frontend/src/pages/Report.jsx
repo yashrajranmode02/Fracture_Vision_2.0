@@ -97,30 +97,49 @@ export default function Report() {
                     </div>
                 </div>
 
-                {/* 3D Viewer */}
-                <div className="glass mb-6" style={{ padding: 28 }}>
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 style={{ fontWeight: 700, fontSize: '1.1rem' }}>🦴 3D Fractured Bone Model</h2>
-                        <a
-                            href={report.model_url?.startsWith('http') ? report.model_url : `http://localhost:8000/api/model/download/${sessionId}`}
-                            download
-                            className="btn btn-sm btn-secondary"
-                        >
-                            📥 Download GLB
-                        </a>
+                {/* Grid for Image and 3D Viewer */}
+                <div className="grid-2 mb-6">
+                    {/* Left: Input Image */}
+                    <div className="glass" style={{ padding: 24 }}>
+                        <h2 style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 16 }}>📸 Raw Input X-Ray</h2>
+                        <div style={{ background: '#000', borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
+                            <img
+                                src={report.xray_url || `http://localhost:8000/api/outputs/xray_${sessionId}.jpg`}
+                                alt="Input X-ray"
+                                style={{ maxHeight: 420, width: 'auto', objectFit: 'contain' }}
+                                onError={(e) => {
+                                    e.target.src = `https://via.placeholder.com/400x600?text=X-Ray+Not+Found`;
+                                }}
+                            />
+                        </div>
+                        <p className="text-xs text-muted mt-3">Original X-ray used for bone detection</p>
                     </div>
-                    <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, overflow: 'hidden', minHeight: 400 }}>
-                        <model-viewer
-                            src={report.model_url || modelUrl}
-                            alt="Fractured forearm model"
-                            auto-rotate
-                            camera-controls
-                            style={{ width: '100%', height: 420 }}
-                            exposure="1"
-                            shadow-intensity="1"
-                        />
+
+                    {/* Right: 3D Viewer */}
+                    <div className="glass" style={{ padding: 24 }}>
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 style={{ fontWeight: 700, fontSize: '1.1rem' }}>🦴 3D Fractured Bone Model</h2>
+                            <a
+                                href={report.model_url?.startsWith('http') ? report.model_url : `http://localhost:8000/api/model/download/${sessionId}`}
+                                download
+                                className="btn btn-sm btn-secondary"
+                            >
+                                📥 GLB
+                            </a>
+                        </div>
+                        <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, overflow: 'hidden', minHeight: 400 }}>
+                            <model-viewer
+                                src={report.model_url || modelUrl}
+                                alt="Fractured forearm model"
+                                auto-rotate
+                                camera-controls
+                                style={{ width: '100%', height: 420 }}
+                                exposure="1"
+                                shadow-intensity="1"
+                            />
+                        </div>
+                        <p className="text-xs text-muted mt-3">Drag to rotate · Scroll to zoom</p>
                     </div>
-                    <p className="text-xs text-muted mt-3">Drag to rotate · Scroll to zoom · Double-click to reset</p>
                 </div>
 
                 {/* Fracture Data */}

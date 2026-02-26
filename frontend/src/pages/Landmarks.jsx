@@ -113,32 +113,34 @@ export default function Landmarks() {
                         )}
                     </div>
 
-                    {/* Canvas */}
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
-                        <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: '1px solid var(--border)', boxShadow: 'var(--shadow-glow)' }}>
-                            <canvas
-                                ref={canvasRef}
-                                width={dw} height={dh}
-                                onClick={handleCanvasClick}
-                                style={{ display: 'block', cursor: dots.length < 4 ? 'crosshair' : 'default', maxWidth: '100%' }}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Landmark chips */}
-                    <div className="flex gap-3 justify-center flex-wrap mb-6">
-                        {LABELS.map((lbl, i) => (
-                            <div key={lbl} style={{
-                                padding: '6px 14px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 600,
-                                background: dots[i] ? 'rgba(16,185,129,0.15)' : 'var(--bg-card)',
-                                border: `1px solid ${dots[i] ? 'rgba(16,185,129,0.4)' : 'var(--border)'}`,
-                                color: dots[i] ? 'var(--success)' : 'var(--text-muted)',
-                                display: 'flex', alignItems: 'center', gap: 6,
-                            }}>
-                                {dots[i] ? '✓' : <span style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS[i], display: 'inline-block' }} />}
-                                <span style={{ textTransform: 'capitalize' }}>{lbl}</span>
+                    {/* Marking Canvas */}
+                    <div className="flex flex-col items-center mb-10">
+                        <div className="glass" style={{ padding: 12, borderRadius: 20, marginBottom: 20, boxShadow: 'var(--shadow-glow)' }}>
+                            <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', border: '1px solid var(--border)', background: '#000' }}>
+                                <canvas
+                                    ref={canvasRef}
+                                    width={dw} height={dh}
+                                    onClick={handleCanvasClick}
+                                    style={{ display: 'block', cursor: dots.length < 4 ? 'crosshair' : 'default', maxWidth: '100%' }}
+                                />
                             </div>
-                        ))}
+                        </div>
+
+                        {/* Landmark chips */}
+                        <div className="flex gap-3 justify-center flex-wrap">
+                            {LABELS.map((lbl, i) => (
+                                <div key={lbl} style={{
+                                    padding: '6px 14px', borderRadius: 20, fontSize: '0.8rem', fontWeight: 600,
+                                    background: dots[i] ? 'rgba(16,185,129,0.15)' : 'var(--bg-card)',
+                                    border: `1px solid ${dots[i] ? 'rgba(16,185,129,0.4)' : 'var(--border)'}`,
+                                    color: dots[i] ? 'var(--success)' : 'var(--text-muted)',
+                                    display: 'flex', alignItems: 'center', gap: 6,
+                                }}>
+                                    {dots[i] ? '✓' : <span style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS[i] }} />}
+                                    <span style={{ textTransform: 'capitalize' }}>{lbl}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
 
                     {err && <div className="alert alert-error mb-4">{err}</div>}

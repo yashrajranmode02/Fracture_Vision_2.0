@@ -23,8 +23,7 @@ def load_and_preprocess_mesh(path: str):
 
     R2 = mesh.get_rotation_matrix_from_axis_angle([0, -np.pi / 2, 0])
     mesh.rotate(R2, center=(0, 0, 0))
-    return mesh
-
+    return mesh 
 
 def split_mesh(mesh):
     """Split the forearm mesh into ulna and radius using a tilted plane."""

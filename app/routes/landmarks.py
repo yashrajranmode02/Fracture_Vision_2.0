@@ -250,11 +250,12 @@ def _run_pipeline(session_id: str, landmarks_px: dict, img_w: int, img_h: int,
             except Exception as e:
                 print(f"[Supabase] Integration error: {e}")
             finally:
-                # CRITICAL: Professional Cleanup - Remove local clinical data after upload
-                for p in [temp_xray, glb_path]:
-                    if os.path.exists(p):
-                        try: os.remove(p)
-                        except: pass
+                # Cleanup disabled for local debugging
+                pass
+                # for p in [temp_xray, glb_path]:
+                #     if os.path.exists(p):
+                #         try: os.remove(p)
+                #         except: pass
 
             # Step Done
             session["status"] = "done"
@@ -316,6 +317,7 @@ async def get_report(session_id: str):
             "fracture_data": session["fracture_data"],
             "risk_result": session["risk_result"],
             "model_url": session.get("model_url") or f"/api/model/{session_id}",
+            "xray_url": session.get("xray_url") or f"/api/outputs/xray_{session_id}.jpg",
         }
 
     # 2. Check Supabase for history
@@ -326,6 +328,7 @@ async def get_report(session_id: str):
             "fracture_data": historical["fracture_data"],
             "risk_result": historical["risk_result"],
             "model_url": historical["model_url"] or f"/api/model/{session_id}",
+            "xray_url": historical.get("xray_url") or f"/api/outputs/xray_{session_id}.jpg",
         }
 
     if session:

@@ -35,8 +35,9 @@ app.add_middleware(
 )
 
 # Mount output files as static (for serving .glb and annotated images)
-outputs_dir = os.path.join(os.path.dirname(__file__), "..", "outputs")
+outputs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "outputs"))
 os.makedirs(outputs_dir, exist_ok=True)
+app.mount("/api/outputs", StaticFiles(directory=outputs_dir), name="outputs")
 
 app.include_router(upload_router, prefix="/api")
 app.include_router(landmarks_router, prefix="/api")
