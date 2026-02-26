@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
+import api from '../api/client';
 import { useNavigate } from 'react-router-dom';
 
 const Settings = () => {
-    const { user, signOut } = useAuth();
+    const { user, logout } = useAuth();
     const [name, setName] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
@@ -14,10 +14,8 @@ const Settings = () => {
         const fetchProfile = async () => {
             if (!user) return;
             try {
-                const token = sessionStorage.getItem('sb-access-token');
-                const res = await axios.get('http://localhost:8000/api/auth/me', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                // Using the centralized api client which already handles the token
+                const res = await api.get('/api/auth/me');
                 setName(res.data.name || '');
             } catch (err) {
                 console.error("Error fetching profile:", err);
@@ -31,12 +29,8 @@ const Settings = () => {
         setLoading(true);
         setMessage('');
         try {
-            const token = sessionStorage.getItem('sb-access-token');
-            await axios.patch('http://localhost:8000/api/auth/profile', { name }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.patch('/api/auth/profile', { name });
             setMessage('Profile updated successfully!');
-            // Update local user name if possible or just refresh
             setTimeout(() => setMessage(''), 3000);
         } catch (err) {
             console.error("Update error:", err);
@@ -100,7 +94,7 @@ const Settings = () => {
                         </button>
                         <button
                             type="button"
-                            onClick={signOut}
+                            onClick={logout}
                             className="btn btn-secondary border-danger/20 text-danger hover:bg-danger/5 hover:border-danger/40"
                         >
                             Log Out

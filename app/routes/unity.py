@@ -59,12 +59,13 @@ async def get_unity_report(session_id: str):
         raise HTTPException(status_code=404, detail="Report not found")
         
     report = res.data[0]
+    risk_data = report.get("risk_result") or {}
     
     return UnityReport(
-        report_name=report["report_name"] or "Untitled Case",
+        report_name=report.get("report_name") or "Untitled Case",
         created_at=report["created_at"],
-        summary=report["summary"],
-        model_url=report["model_url"],
-        landmarks=report["landmarks"] or {},
-        risks=report["risks"] or []
+        summary=risk_data.get("summary") or "No summary available",
+        model_url=report["model_url"] or "",
+        landmarks=report.get("landmarks") or {},
+        risks=risk_data.get("damaged_structures") or []
     )

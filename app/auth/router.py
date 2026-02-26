@@ -23,6 +23,21 @@ def _get_current_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(be
             raise HTTPException(status_code=401, detail="Invalid or expired token")
         
         user = user_res.user
+        
+        # SYNC: Ensure user exists in the 'users' table for related queries (like Unity history)
+        try:
+            # Check if record exists
+            existing = supabase.table("users").select("id").eq("id", user.id).execute()
+            if not existing.data:
+                # Insert fresh record
+                supabase.table("users").insert({
+                    "id": user.id,
+                    "email": user.email,
+                    "name": user.user_metadata.get("name", "User")
+                }).execute()
+        except Exception as sync_err:
+            print(f"[Auth] Sync warning (non-fatal): {sync_err}")
+
         return {
             "id": user.id,
             "email": user.email,

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getHistory } from '../api/client';
+import api, { getHistory } from '../api/client';
 import Navbar from '../components/Navbar';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
 function History() {
@@ -17,10 +16,7 @@ function History() {
         if (!window.confirm("Are you sure you want to delete this clinical report? This action cannot be undone.")) return;
 
         try {
-            const token = sessionStorage.getItem('sb-access-token');
-            await axios.delete(`http://localhost:8000/api/history/${sessionId}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.delete(`/api/history/${sessionId}`);
             setHistory(prev => prev.filter(item => item.session_id !== sessionId));
         } catch (err) {
             console.error("Delete error:", err);

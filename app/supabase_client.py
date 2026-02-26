@@ -5,10 +5,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
+# Use Service Role Key if available (permits bypassing RLS for Unity/Backend routes)
+key: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY")
 
 if not url or not key:
-    print("[Supabase] WARNING: SUPABASE_URL or SUPABASE_KEY not found in environment")
+    print("[Supabase] WARNING: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY/KEY not found in environment")
     supabase: Client = None
 else:
     supabase: Client = create_client(url, key)
