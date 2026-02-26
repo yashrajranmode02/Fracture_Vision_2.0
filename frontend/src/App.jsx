@@ -8,6 +8,7 @@ import Landmarks from './pages/Landmarks';
 import Processing from './pages/Processing';
 import Report from './pages/Report';
 import History from './pages/History';
+import Settings from './pages/Settings';
 
 function RequireAuth({ children }) {
   const { isLoggedIn } = useAuth();
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/report" element={<RequireAuth><Report /></RequireAuth>} />
           <Route path="/report/:sessionId" element={<RequireAuth><Report /></RequireAuth>} />
           <Route path="/history" element={<RequireAuth><History /></RequireAuth>} />
+          <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

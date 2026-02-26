@@ -55,7 +55,8 @@ class LandmarksRequest(BaseModel):
 
 
 def _run_pipeline(session_id: str, landmarks_px: dict, img_w: int, img_h: int,
-                  groq_api_key: str = None, user_id: str = None, report_name: str = "New Analysis"):
+                  groq_api_key: str = None, user_id: str = None, report_name: str = "New Analysis",
+                  jwt_token: str = None):
     """Blocking pipeline — runs in a thread pool."""
     loop = asyncio.new_event_loop()
 
@@ -129,12 +130,16 @@ def _run_pipeline(session_id: str, landmarks_px: dict, img_w: int, img_h: int,
                         )
                         geometries.append(patch)
 
+                    severity = "severe" if abs(top_angle) > 15 or abs(bot_angle) > 15 else \
+                               "moderate" if abs(top_angle) > 8 or abs(bot_angle) > 8 else "mild"
+
                     fracture_data.append({
                         "bone": bone,
                         "damage": "crack",
                         "location": round(float(split_ratio), 3),
                         "top_angle": round(float(top_angle), 2),
                         "bottom_angle": round(float(bot_angle), 2),
+                        "severity": severity
                     })
                 else:
                     solid = make_solid(mesh_part)
@@ -144,7 +149,7 @@ def _run_pipeline(session_id: str, landmarks_px: dict, img_w: int, img_h: int,
             session["fracture_data"] = fracture_data
 
             # Step 5 – Combine and save .glb
-            await push_progress(session_id, 5, 7, "Finalizing 3D model…")
+            await push_progress(session_id, 5, 7, "Finalizing 3D model package…")
             import trimesh
             from PIL import Image as PILImage
             from trimesh.visual.material import PBRMaterial
@@ -205,32 +210,24 @@ def _run_pipeline(session_id: str, landmarks_px: dict, img_w: int, img_h: int,
 
             # Step 6 – Groq risk analysis
             await push_progress(session_id, 6, 7, "Running AI risk analysis (Groq)…")
-            risk = None
-            try:
-                risk = analyze_fracture_risk(fracture_data, groq_api_key)
-                session["risk_result"] = risk
-            except Exception as e:
-                # Store the error so frontend can show it
-                session["risk_result"] = {"error": str(e)}
-                await push_progress(session_id, 6, 7, f"Risk analysis failed: {e}", "warning")
+            risk = analyze_fracture_risk(fracture_data, groq_api_key)
+            session["risk_result"] = risk
 
-            # Step 8 – PERSIST TO SUPABASE
-            await push_progress(session_id, 7, 7, "Saving report to history (Supabase)…")
+            # Step 7 – PERSIST TO SUPABASE & CLEANUP
+            await push_progress(session_id, 7, 7, "Synchronizing with clinical cloud…")
+            temp_xray = os.path.join(OUTPUT_DIR, f"xray_{session_id}.jpg")
             try:
                 # 1. Upload X-ray image
                 xray_url = None
                 if img_orig is not None:
-                    temp_xray = os.path.join(OUTPUT_DIR, f"xray_{session_id}.jpg")
                     cv2.imwrite(temp_xray, img_orig)
                     xray_url = upload_file_to_supabase(
-                        temp_xray, "fractures", f"users/{user_id}/{session_id}/xray.jpg"
+                        temp_xray, "fractures", f"users/{user_id}/{session_id}/xray.jpg", jwt_token
                     )
-                    try: os.remove(temp_xray)
-                    except: pass
 
                 # 2. Upload GLB model
                 model_url = upload_file_to_supabase(
-                    glb_path, "fractures", f"users/{user_id}/{session_id}/model.glb"
+                    glb_path, "fractures", f"users/{user_id}/{session_id}/model.glb", jwt_token
                 )
                 
                 # 3. Save to reports table
@@ -244,12 +241,22 @@ def _run_pipeline(session_id: str, landmarks_px: dict, img_w: int, img_h: int,
                     "fracture_data": fracture_data,
                     "risk_result": session["risk_result"],
                 }
-                save_report_to_supabase(report_entry)
-                print(f"[Supabase] History saved for {session_id} (User: {user_id}, Name: {report_name})")
+                save_report_to_supabase(report_entry, jwt_token)
+                
+                # Update session with cloud URLs for immediate UI consistency
+                session["xray_url"] = xray_url
+                session["model_url"] = model_url
+                print(f"[Supabase] History saved and session updated for {session_id}")
             except Exception as e:
                 print(f"[Supabase] Integration error: {e}")
+            finally:
+                # CRITICAL: Professional Cleanup - Remove local clinical data after upload
+                for p in [temp_xray, glb_path]:
+                    if os.path.exists(p):
+                        try: os.remove(p)
+                        except: pass
 
-            # Step 7 – Done
+            # Step Done
             session["status"] = "done"
             await push_done(session_id)
 
@@ -292,7 +299,8 @@ async def submit_landmarks(req: LandmarksRequest, user=Depends(_get_current_user
         req.image_width, req.image_height,
         req.groq_api_key, 
         user.get("id"),
-        session.get("report_name", "New Analysis")
+        session.get("report_name", "New Analysis"),
+        user.get("token")
     )
 
     return {"status": "processing", "message": "Pipeline started. Listen to /api/progress/{session_id} for updates."}
@@ -307,7 +315,7 @@ async def get_report(session_id: str):
             "report_name": session.get("report_name", "New Analysis"),
             "fracture_data": session["fracture_data"],
             "risk_result": session["risk_result"],
-            "model_url": f"/api/model/{session_id}",
+            "model_url": session.get("model_url") or f"/api/model/{session_id}",
         }
 
     # 2. Check Supabase for history
@@ -328,7 +336,7 @@ async def get_report(session_id: str):
 
 @router.get("/history")
 async def get_history(user=Depends(_get_current_user)):
-    reports = get_reports_from_supabase(user_id=user.get("id"))
+    reports = get_reports_from_supabase(user_id=user.get("id"), jwt_token=user.get("token"))
     # Simplify the response for the dashboard
     return [{
         "id": r["id"],
@@ -338,3 +346,18 @@ async def get_history(user=Depends(_get_current_user)):
         "xray_url": r.get("xray_url"),
         "summary": (r["risk_result"].get("summary") if r["risk_result"] and "summary" in r["risk_result"] else "No summary available")
     } for r in reports]
+
+@router.delete("/history/{session_id}")
+async def delete_history(session_id: str, user=Depends(_get_current_user)):
+    user_id = user.get("id")
+    supabase = _get_client(jwt_token=None)
+    # Verify ownership
+    check = supabase.table("reports").select("user_id").eq("session_id", session_id).execute()
+    if not check.data:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    if check.data[0]["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this report")
+        
+    supabase.table("reports").delete().eq("session_id", session_id).execute()
+    return {"status": "success", "message": "Report deleted"}

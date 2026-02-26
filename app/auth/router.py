@@ -26,7 +26,8 @@ def _get_current_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(be
         return {
             "id": user.id,
             "email": user.email,
-            "name": user.user_metadata.get("name", "User")
+            "name": user.user_metadata.get("name", "User"),
+            "token": creds.credentials
         }
     except Exception as e:
         print(f"[Auth] Token verification error: {e}")
@@ -35,3 +36,18 @@ def _get_current_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(be
 @router.get("/me")
 def me(user=Depends(_get_current_user)):
     return user
+
+@router.patch("/profile")
+async def update_profile(data: dict, user=Depends(_get_current_user)):
+    from app.supabase_client import supabase
+    user_id = user.get("id")
+    
+    update_data = {}
+    if "name" in data:
+        update_data["name"] = data["name"]
+        
+    if not update_data:
+        return {"status": "no-change"}
+        
+    res = supabase.table("users").update(update_data).eq("id", user_id).execute()
+    return {"status": "success", "data": res.data[0] if res.data else {}}

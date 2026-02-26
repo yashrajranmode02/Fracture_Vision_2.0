@@ -19,12 +19,17 @@ export default function Navbar() {
                 <div className="navbar-links">
                     {isLoggedIn ? (
                         <>
-                            <span className="text-secondary text-sm" style={{ marginRight: 8 }}>
-                                {user?.name}
-                            </span>
+                            <Link to="/settings" className="flex items-center gap-2 group" style={{ marginRight: 16 }}>
+                                <span className="text-sm font-bold group-hover:text-accent transition-colors">
+                                    {user.user_metadata?.name || user.email.split('@')[0]}
+                                </span>
+                                <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center text-accent text-xs border border-accent/20 group-hover:border-accent group-hover:shadow-[0_0_15px_rgba(0,212,255,0.4)] transition-all">
+                                    {user.email[0].toUpperCase()}
+                                </div>
+                            </Link>
                             <Link to="/history" className="btn btn-ghost btn-sm" style={{ marginRight: 8 }}>History</Link>
                             <Link to="/upload" className="btn btn-primary btn-sm">New Analysis</Link>
-                            <button className="btn btn-ghost btn-sm" onClick={handleLogout}>Sign out</button>
+                            <button className="btn btn-ghost btn-sm" onClick={handleLogout} style={{ marginLeft: 8 }}>Sign out</button>
                         </>
                     ) : (
                         <>

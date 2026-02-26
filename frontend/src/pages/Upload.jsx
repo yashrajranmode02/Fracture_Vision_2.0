@@ -78,8 +78,8 @@ export default function Upload() {
                 <div style={{ width: '100%', maxWidth: 640 }}>
                     <div className="text-center mb-8">
                         <div className="badge" style={{ marginBottom: 16 }}>Step 1 of 4</div>
-                        <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: 8 }}>Upload X-Ray</h1>
-                        <p className="text-secondary">Upload your forearm X-ray image (JPG or PNG)</p>
+                        <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: 8 }}>Upload New X-Ray</h1>
+                        <p className="text-secondary">Drag & drop your DICOM or Image file here to start the AI fracture detection process.</p>
                     </div>
 
                     <div className="glass mb-8" style={{ padding: 24, borderRadius: 20 }}>
@@ -140,10 +140,10 @@ export default function Upload() {
                             <>
                                 <div style={{ fontSize: '3rem' }}>🩻</div>
                                 <div>
-                                    <p style={{ fontWeight: 600, marginBottom: 4 }}>Drag &amp; drop your X-ray here</p>
+                                    <p style={{ fontWeight: 600, marginBottom: 4 }}>Drag &amp; drop your DICOM or Image file here</p>
                                     <p className="text-sm text-secondary">or click to browse files</p>
                                 </div>
-                                <p className="text-xs text-muted">Supports JPG, PNG, JPEG · Max 20MB</p>
+                                <p className="text-xs text-muted">Supports JPG, PNG, JPEG, DCM · Max 20MB</p>
                             </>
                         )}
                     </div>
@@ -156,7 +156,7 @@ export default function Upload() {
                             disabled={!file || !reportName || loading}
                             onClick={handleSubmit}
                         >
-                            {loading ? <><div className="spinner" />Uploading…</> : 'Continue to Landmark Marking →'}
+                            {loading ? <><div className="spinner" />Analyzing Radiography... Uploading and processing X-ray image</> : 'Continue to Landmark Marking →'}
                         </button>
                     </div>
                 </div>

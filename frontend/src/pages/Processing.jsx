@@ -4,14 +4,14 @@ import { openProgressStream } from '../api/client';
 import Navbar from '../components/Navbar';
 
 const STEP_LABELS = [
-    '', // step 0 unused
-    'Loading and preprocessing 3D model',
-    'Splitting mesh into ulna / radius',
-    'Running YOLO fracture detection',
-    'Generating fractured 3D geometry',
-    'Saving 3D model',
-    'Running AI risk analysis',
-    'Pipeline complete',
+    '',
+    '3D Model Initialization',
+    'Anatomical Segmentation',
+    'Fracture Detection',
+    'Geometry Reconstruction',
+    'Cloud Synchronization',
+    'AI Risk Assessment',
+    'Diagnostic Finalized',
 ];
 
 export default function Processing() {
@@ -40,13 +40,17 @@ export default function Processing() {
                         next.push({ step: ev.step, label: ev.message, status: ev.status });
                     } else {
                         existing.status = ev.status;
+                        existing.label = ev.message;
                     }
-                    return next;
+                    // Mark all previous steps as done
+                    return next.map(s => s.step < ev.step ? { ...s, status: 'done' } : s);
                 });
             }
 
             if (ev.status === 'done') {
                 es.close();
+                // Mark final step as done
+                setSteps(prev => prev.map(s => ({ ...s, status: 'done' })));
                 setTimeout(() => navigate('/report', { state: { sessionId } }), 1200);
             }
             if (ev.status === 'error') es.close();
@@ -91,8 +95,10 @@ export default function Processing() {
                                                 isErr ? '✕' : n}
                                     </div>
                                     <div>
-                                        <div className="step-label">{STEP_LABELS[n]}</div>
-                                        {ev && <div className="text-xs text-muted mt-1">{ev.label}</div>}
+                                        <div className="step-label" style={{ fontWeight: 600 }}>{STEP_LABELS[n]}</div>
+                                        {ev && ev.label !== STEP_LABELS[n] && (
+                                            <div className="text-xs text-muted mt-1" style={{ opacity: 0.8 }}>{ev.label}</div>
+                                        )}
                                     </div>
                                 </div>
                             );

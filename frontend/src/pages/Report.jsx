@@ -86,8 +86,8 @@ export default function Report() {
                 <div className="flex justify-between items-center mb-8" style={{ flexWrap: 'wrap', gap: 12 }}>
                     <div>
                         <div className="badge mb-2">Step 4 of 4 — Complete</div>
-                        <h1 style={{ fontSize: '2rem', fontWeight: 800 }}>{report.report_name}</h1>
-                        <p className="text-secondary text-sm">Fracture Analysis Report</p>
+                        <h1 style={{ fontSize: '2rem', fontWeight: 800 }}>Fracture Analysis Report</h1>
+                        <p className="text-secondary text-sm">AI-driven diagnostic summary</p>
                     </div>
                     <div className="flex gap-3">
                         <button className="btn btn-primary" onClick={() => setIsChatOpen(true)}>
@@ -131,7 +131,7 @@ export default function Report() {
                             <table className="risk-table">
                                 <thead>
                                     <tr>
-                                        <th>Bone</th><th>Type</th><th>Location</th><th>Top Angle</th><th>Bottom Angle</th>
+                                        <th>Bone</th><th>Type</th><th>Location (Distal/Proximal)</th><th>Proximal Angle</th><th>Distal Angle</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -194,6 +194,9 @@ export default function Report() {
                         AI Risk analysis results are not yet available. Please ensure the pipeline completed successfully.
                     </div>
                 )}
+                <p className="text-xs text-secondary text-center mt-12" style={{ opacity: 0.5 }}>
+                    Generated for academic & research evaluation using Fracture Vision AI
+                </p>
             </div>
 
             {isChatOpen && <ChatWindow sessionId={sessionId} onClose={() => setIsChatOpen(false)} />}

@@ -6,10 +6,10 @@ import Navbar from '../components/Navbar';
 const LABELS = ['ulna head', 'ulna tail', 'radius head', 'radius tail'];
 const COLORS = ['#00d4ff', '#7c3aed', '#10b981', '#f59e0b'];
 const INSTRUCTIONS = [
-    'Click the top tip of the ulna bone (ulna head)',
-    'Click the bottom tip of the ulna bone (ulna tail)',
-    'Click the top tip of the radius bone (radius head)',
-    'Click the bottom tip of the radius bone (radius tail)',
+    'Click to mark: Ulna Head',
+    'Click to mark: Ulna Tail',
+    'Click to mark: Radius Head',
+    'Click to mark: Radius Tail',
 ];
 
 export default function Landmarks() {
@@ -95,8 +95,8 @@ export default function Landmarks() {
                 <div style={{ width: '100%', maxWidth: 900 }}>
                     <div className="text-center mb-6">
                         <div className="badge" style={{ marginBottom: 12 }}>Step 2 of 4</div>
-                        <h1 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: 6 }}>Mark Bone Landmarks</h1>
-                        <p className="text-secondary">Click on the image to place 4 bone endpoints</p>
+                        <h1 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: 6 }}>Bone Structure Analysis</h1>
+                        <p className="text-secondary">Please precisely mark the 4 key anatomical points on the X-ray</p>
                     </div>
 
                     {/* Instruction */}
@@ -136,7 +136,7 @@ export default function Landmarks() {
                                 display: 'flex', alignItems: 'center', gap: 6,
                             }}>
                                 {dots[i] ? '✓' : <span style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS[i], display: 'inline-block' }} />}
-                                {lbl}
+                                <span style={{ textTransform: 'capitalize' }}>{lbl}</span>
                             </div>
                         ))}
                     </div>

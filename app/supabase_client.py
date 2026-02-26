@@ -13,23 +13,49 @@ if not url or not key:
 else:
     supabase: Client = create_client(url, key)
 
-def save_report_to_supabase(data: dict):
+def _get_client(jwt_token: str = None) -> Client:
     if not supabase:
+        return None
+    if not jwt_token:
+        return supabase
+    
+    # Create a fresh client for this request to be thread-safe with RLS
+    # This avoids modifying the global 'supabase' client's headers
+    scoped_client = create_client(url, key)
+    scoped_client.postgrest.auth(jwt_token)
+    # For storage, we need to update the headers on the session
+    if hasattr(scoped_client.storage, 'session'):
+        scoped_client.storage.session.headers.update({"Authorization": f"Bearer {jwt_token}"})
+    return scoped_client
+
+def save_report_to_supabase(data: dict, jwt_token: str = None):
+    client = _get_client(jwt_token)
+    if not client:
         print("[Supabase] Error: Client not initialized")
         return None
+    
     try:
         print(f"[Supabase] Attempting to save report for session {data.get('session_id')}")
-        response = supabase.table("reports").insert(data).execute()
-        print(f"[Supabase] Save success: {response.data}")
-        return response.data
+        response = client.table("reports").insert(data).execute()
+        if hasattr(response, 'data') and response.data:
+            print(f"[Supabase] Save success: {response.data}")
+            return response.data
+        else:
+            print(f"[Supabase] Save returned no data: {response}")
+            return None
     except Exception as e:
-        print(f"[Supabase] CRITICAL Error saving report: {e}")
+        print(f"[Supabase] CRITICAL Error saving report: {type(e).__name__} - {e}")
+        # Try to print response body if it's a PostgrestError
+        if hasattr(e, 'message'):
+            print(f"[Supabase] Error message: {e.message}")
         return None
 
-def upload_file_to_supabase(file_path: str, bucket: str, destination_path: str):
-    if not supabase:
+def upload_file_to_supabase(file_path: str, bucket: str, destination_path: str, jwt_token: str = None):
+    client = _get_client(jwt_token)
+    if not client:
         print("[Supabase] Error: Client not initialized")
         return None
+    
     try:
         print(f"[Supabase] Uploading {file_path} to {bucket}/{destination_path}")
         if not os.path.exists(file_path):
@@ -37,26 +63,27 @@ def upload_file_to_supabase(file_path: str, bucket: str, destination_path: str):
             return None
             
         with open(file_path, "rb") as f:
-            response = supabase.storage.from_(bucket).upload(
+            response = client.storage.from_(bucket).upload(
                 path=destination_path,
                 file=f,
                 file_options={"upsert": "true"}
             )
         
         # Get public URL
-        res = supabase.storage.from_(bucket).get_public_url(destination_path)
+        res = client.storage.from_(bucket).get_public_url(destination_path)
         print(f"[Supabase] Upload success. Public URL: {res}")
         return res
     except Exception as e:
         print(f"[Supabase] CRITICAL Error uploading file {file_path}: {e}")
         return None
 
-def get_reports_from_supabase(user_id: str = None):
-    if not supabase:
+def get_reports_from_supabase(user_id: str = None, jwt_token: str = None):
+    client = _get_client(jwt_token)
+    if not client:
         return []
     try:
         print(f"[Supabase] Fetching report history{' for user ' + user_id if user_id else ''}...")
-        query = supabase.table("reports").select("*").order("created_at", desc=True)
+        query = client.table("reports").select("*").order("created_at", desc=True)
         if user_id:
             query = query.eq("user_id", user_id)
         response = query.execute()
