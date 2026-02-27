@@ -7,7 +7,39 @@ import open3d as o3d
 
 
 def load_and_preprocess_mesh(path: str):
-    mesh = o3d.io.read_triangle_mesh(path)
+    import trimesh
+    # Load as scene to preserve separate geometries
+    scene = trimesh.load(path)
+    
+    # Filter for geometries that look like bones (high vertex count) 
+    # and exclude small debris or vein-like structures (low vertex/face count)
+    bone_meshes = []
+    
+    # Iterate through geometries in the scene
+    for name, geometry in scene.geometry.items():
+        # Bones typically have thousands of vertices. Veins/lines are usually much smaller.
+        if len(geometry.vertices) > 2000:
+            bone_meshes.append(geometry)
+    
+    if not bone_meshes:
+        # Fallback: if filtering fails, take the largest mesh by vertex count
+        all_geoms = list(scene.geometry.values())
+        if all_geoms:
+            bone_meshes = [max(all_geoms, key=lambda g: len(g.vertices))]
+        else:
+            # Last resort: open3d default load
+            mesh = o3d.io.read_triangle_mesh(path)
+            return mesh
+
+    # Merge bone meshes
+    merged_trimesh = trimesh.util.concatenate(bone_meshes)
+    
+    # Convert to Open3D
+    mesh = o3d.geometry.TriangleMesh()
+    mesh.vertices = o3d.utility.Vector3dVector(merged_trimesh.vertices)
+    mesh.triangles = o3d.utility.Vector3iVector(merged_trimesh.faces)
+    
+    # Preprocess
     mesh.remove_duplicated_vertices()
     mesh.remove_degenerate_triangles()
     mesh.remove_duplicated_triangles()
